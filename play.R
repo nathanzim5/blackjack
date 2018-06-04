@@ -1,3 +1,7 @@
+#Functions for simulating blackjack and the red 7 card counting system
+#Author: Nathan Zimmerman
+
+
 setwd("~/blackjack")
 
 #define deck of cards
@@ -8,16 +12,19 @@ deck_val <- deck_rank
 deck_val[which(deck_rank == "A")] <- 1
 deck_val[which(deck_rank %in% c("J", "Q", "K"))] <- 10
 deck_val <- as.numeric(deck_val)
+
+#define red 7 card values
 deck_r7 <- rep(0, 52)
 deck_r7[deck_val %in% c(1, 10)] <- -1
 deck_r7[deck_val %in% 2:6 | (deck_val == 7 & deck_col == "R")] <- 1
 
-#define r7
+#define red 7 count and bet ramp
 r7_count <- -120:132
 r7_min <- min(r7_count)
 r7_length <- length(r7_count)
 r7_bet_ramp <- c(rep(0, 100), rep(1, 21), 1, 2, 2, 4, 6, 8, 12, 16, 20, 20, rep(20, 122))
 
+#enumerate play options for all hand types and values
 dec_choices <- list(c("H", "S"),
                     "H",
                     c("H", "S"),
@@ -51,6 +58,7 @@ dec_length_sum <- sum(dec_length)
 dec_minval <- sapply(dec_val, min)
 dec_div <- c(1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2)
 
+
 #play blackjack
 play <- function(n_shoes = 1,
                  n_decks = 6,
@@ -58,9 +66,18 @@ play <- function(n_shoes = 1,
                  n_players = 1,
                  pen = 1,
                  strat_play = rep("basic", n_players),
-                 strat_bet = rep("flat", n_players)
+                 strat_bet = rep("flat", n_players),
+                 spec_type = NA,
+                 spec_tot = NA,
+                 spec_d = NA
 ) {
-  out_p <- rep(0, n_players)
+  
+  #initialize output vector
+  out_p <- vector("list", length = 3)
+  names(out_p) <- c("bet", "res", "avg")
+  for(i in 1:length(out_p)){
+    out_p[[i]] <- rep(0, n_players)
+  }
   
   #define shoe
   shoe_val <- rep(deck_val, n_decks)
@@ -73,6 +90,9 @@ play <- function(n_shoes = 1,
   for(i in 1:n_players) {
     sp_vec[[i]] <- scan(sp_file[i], what = "character", quiet = TRUE)
   }
+  
+  #define specify
+  no_spec <- ifelse(is.na(spec_type) & is.na(spec_tot) & is.na(spec_d), 1, 0)
 
   #loop through shoes
   for(i in 1:n_shoes) {
@@ -82,7 +102,7 @@ play <- function(n_shoes = 1,
       cat("*")
     }
     
-    #shuffle shoe
+    #shuffle shoe and initialize card count and red 7 count
     sam <- sample(1:n_cards, n_cards)
     shoe_val <- shoe_val[sam]
     shoe_r7 <- shoe_r7[sam]
@@ -107,7 +127,8 @@ play <- function(n_shoes = 1,
                                      tot = NULL,
                                      res = NA)),
                        i_bet = NA,
-                       i_res = NA)
+                       i_res = NA,
+                       spec_on = no_spec)
         r7 <- r7 + shoe_r7[dlt + 1] + shoe_r7[dlt + 2]
         dlt <- dlt + 2
       }
@@ -236,6 +257,13 @@ play <- function(n_shoes = 1,
                                      r7_length * 10 * (p[[k]]$h[[l]]$tot - dec_minval[p[[k]]$h[[l]]$typ]) / dec_div[p[[k]]$h[[l]]$typ] +
                                      r7_length * (d$val[1] - 1) + r7 - r7_min + 1]
                 
+                #identify if specified hand was seen
+                if((p[[k]]$h[[l]]$typ == spec_type | is.na(spec_type)) & 
+                   (p[[k]]$h[[l]]$tot == spec_tot | is.na(spec_tot)) & 
+                   (d$val[1] == spec_d | is.na(spec_d))) {
+                  p[[k]]$spec_on <- 1
+                }
+                
                 #split
                 if(dec == "P") {
                   for(n in 1:2) {
@@ -333,13 +361,18 @@ play <- function(n_shoes = 1,
       
       #calculate total result for each player
       for(k in 1:n_players) {
-        out_p[k] <- out_p[k] + sum(sapply(p[[k]]$h, "[[", "res"), p[[k]]$i_res, na.rm = TRUE)
+        out_p$bet[k] <- out_p$bet[k] + sum(sum(sapply(p[[k]]$h, "[[", "bet")) * p[[k]]$spec_on, 
+                                           p[[k]]$i_bet * no_spec, na.rm = TRUE)
+        out_p$res[k] <- out_p$res[k] + sum(sum(sapply(p[[k]]$h, "[[", "res")) * p[[k]]$spec_on, 
+                                           p[[k]]$i_res * no_spec, na.rm = TRUE)
       }
       
-      #add second dealer card to count
+      #add second dealer card to red 7 count
       r7 <- r7 + dealer2_r7
     }
   }
+  
+  out_p$avg <- out_p$res / out_p$bet
   return(out_p)
 }
 
