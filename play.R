@@ -39,9 +39,9 @@ dec_choices <- list(c("H", "S"),
                     c("P", "H", "D"),
                     c("P", "S"))
 dec_val <- list(20:12,
-                11:6,
+                11:7,
                 10:7,
-                6:3,
+                6:4,
                 19:12,
                 11:5,
                 10:7,
@@ -69,12 +69,13 @@ play <- function(n_shoes = 1,
                  strat_bet = rep("flat", n_players),
                  spec_type = NA,
                  spec_tot = NA,
-                 spec_d = NA
+                 spec_d = NA,
+                 spec_ins = NA
 ) {
   
   #initialize output vector
   out_p <- vector("list", length = 3)
-  names(out_p) <- c("bet", "res", "avg")
+  names(out_p) <- c("dh", "res", "avg")
   for(i in 1:length(out_p)){
     out_p[[i]] <- rep(0, n_players)
   }
@@ -92,7 +93,7 @@ play <- function(n_shoes = 1,
   }
   
   #define specify
-  no_spec <- ifelse(is.na(spec_type) & is.na(spec_tot) & is.na(spec_d), 1, 0)
+  no_spec <- ifelse(is.na(spec_type) & is.na(spec_tot) & is.na(spec_d) & is.na(spec_ins), 1, 0)
 
   #loop through shoes
   for(i in 1:n_shoes) {
@@ -260,7 +261,8 @@ play <- function(n_shoes = 1,
                 #identify if specified hand was seen
                 if((p[[k]]$h[[l]]$typ == spec_type | is.na(spec_type)) & 
                    (p[[k]]$h[[l]]$tot == spec_tot | is.na(spec_tot)) & 
-                   (d$val[1] == spec_d | is.na(spec_d))) {
+                   (d$val[1] == spec_d | is.na(spec_d)) &
+                   is.na(spec_ins)) {
                   p[[k]]$spec_on <- 1
                 }
                 
@@ -361,10 +363,15 @@ play <- function(n_shoes = 1,
       
       #calculate total result for each player
       for(k in 1:n_players) {
-        out_p$bet[k] <- out_p$bet[k] + sum(sum(sapply(p[[k]]$h, "[[", "bet")) * p[[k]]$spec_on, 
-                                           p[[k]]$i_bet * no_spec, na.rm = TRUE)
-        out_p$res[k] <- out_p$res[k] + sum(sum(sapply(p[[k]]$h, "[[", "res")) * p[[k]]$spec_on, 
-                                           p[[k]]$i_res * no_spec, na.rm = TRUE)
+        
+        if(!is.na(spec_ins)) {
+          out_p$dh[k] <- out_p$dh[k] + ifelse(!is.na(p[[k]]$i_bet), 1, 0)
+          out_p$res[k] <- sum(out_p$res[k], p[[k]]$i_res, na.rm = TRUE)
+        } else {
+          out_p$dh[k] <- out_p$dh[k] + p[[k]]$spec_on
+          out_p$res[k] <- out_p$res[k] + sum(sum(sapply(p[[k]]$h, "[[", "res")) * p[[k]]$spec_on, 
+                                             p[[k]]$i_res * no_spec, na.rm = TRUE)
+        }
       }
       
       #add second dealer card to red 7 count
@@ -372,7 +379,7 @@ play <- function(n_shoes = 1,
     }
   }
   
-  out_p$avg <- out_p$res / out_p$bet
+  out_p$avg <- ifelse(is.nan(out_p$res / out_p$dh), 0, out_p$res / out_p$dh)
   return(out_p)
 }
 
