@@ -69,7 +69,7 @@ gen_strat <- function(n_shoes = 1000,
   cat("\n")
   
   #clean up intermediate files
-  file.remove(paste0("strat_play_", n_decks, "d_", ifelse(H17 == 1, "H17_", ""), "basic_w", c("H", "S", "D", "P"), ".txt"))
+  file.remove(paste0("strat_play_", n_decks, "d_", ifelse(H17 == 1, "H17_", ""), "basic_w", c("H", "S", "D", "P", "I", "N"), ".txt"))
 }
 
 gen_strat()
